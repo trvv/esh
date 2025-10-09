@@ -1,0 +1,427 @@
+#!/bin/sh
+
+# shellcheck disable=SC2209
+
+#################
+# Your eshcape. #
+#################
+
+# Note that the space at the end of an alias definition is meaningful.
+
+# Honestly don't think many of the aliases will be used, so it is fair to
+# consider removing them entirely. Not for now, though.
+
+# Usage: forever :; reverof
+# Example:
+#   forever echo hi; reverof
+# Shorthand for infinite loops.
+# alias forever='while :; do '
+# alias reverof='done'
+
+# Shorthand for a succesful return. Encouraged over `:`.
+#alias pass='return 0'
+
+# Shorthand for an unsuccesful return; inherits previous command's status
+# if erroneous.
+#alias fail='return $(($? ? $? : 1))'
+
+# Longhand for `!`.
+# alias not='! '
+
+# Shorthand for an ok status. Probably don't need longterm.
+# alias so='test $? = 0'
+
+# Report a message to stderr and exit or return a negative status. Inherits an
+# STATUS variable for returning and a THIS variable for context indication.
+throw() {
+    # shellcheck disable=SC2319
+    eval "
+        test \$# != 0 && >&2 printf '%s\\n' \"\${THIS+\"\$THIS: \"}\$*\"
+        case \$- in
+            (*i*) return \"\${STATUS-$(($? ? $? : 1))}\";;
+            (*) exit \"\${STATUS-$(($? ? $? : 1))}\";;
+        esac
+    "
+}
+
+# Variadic quote. Depends on wrap(f).
+quote() {
+    case $# in
+        (0) :;;
+        (1) wrap "$1";;
+        (*)
+            while test $# != 1; do
+                wrap "$1" '%s%c' "$IFS"
+                shift
+            done
+            wrap "$1"
+        ;;
+    esac
+}
+
+# Basic string matching. Not safe.
+match() {
+    case $# in
+        (0) THIS=match throw "expected pattern argument";;
+        (1) THIS=match throw "expected argument";;
+        (2) eval "case \$2 in ($1) :;; (*) !;; esac";;
+        (*) THIS=match throw "too many arguments";;
+    esac
+}
+
+# This is a seperate function and not a `not match` because there is the chance
+# that at some point these support variadic argumentation and then would need
+# different variations for different short circuit behaviors on the AND
+# condition over all of the arguments.
+clash() {
+    case $# in
+        (0) THIS=clash throw "expected pattern argument";;
+        (1) THIS=clash throw "expected argument";;
+        (2) eval "case \$2 in ($1) !;; (*) :;; esac";;
+        (*) THIS=clash throw "too many arguments";;
+    esac
+}
+
+# Safely quote a given string. Optionally accepts a printf format string to
+# template the newly quoted string. And a secret third variable for injecting
+# IFS for usage in `list`.
+wrap() {
+    # shellcheck disable=SC2059,SC2139
+    case $# in
+        (0) THIS=wrap throw "expected argument";;
+        (*)
+            case $1 in
+                (*\'*)
+                    # Alias abuse
+                    set -- "$(
+                        alias _="$1"
+                        alias _
+                    )"
+                    printf "${2-"%s\\n"}" "${1#??}" ${3+"$3"}
+                ;;
+                (*) printf "${2-"%s\\n"}" "'$1'" ${3+"$3"};;
+            esac
+        ;;
+    esac
+}
+
+# Safely expand variable by name.
+peek() {
+    case $# in
+        (0) THIS=peek throw "expected name";;
+        (1)
+            case $1 in
+                ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=peek throw "$1: bad name";;
+                (*) eval "printf '%s\\n' \"\$$1\"";;
+            esac
+        ;;
+        (*) THIS=peek throw "too many arguments";;
+    esac
+}
+
+# Unsafe, complete parameter expansion.
+expand() {
+    case $# in
+        (0) THIS=expand throw "expected name";;
+        (1) eval "printf '%s\\n' \"\${$1}\"";;
+        (*) THIS=expand throw "too many arguments";;
+    esac
+}
+
+# Set variable, without defaulting any traits. Shaped like declare.
+put() {
+    case $# in
+        (0) THIS=put throw "expected name or definition";;
+        (*)
+            while test $# != 0; do
+                # Might be a way to optimize this down to a single case.
+                # Might be.
+                case ${1%%=*} in
+                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=put throw "$1: bad name";;
+                    (*)
+                        case $1 in
+                            (*=*) eval "${1%%=*}=\${1#*=}";;
+                            (*) unset "$1";;
+                        esac
+                    ;;
+                esac
+                shift
+            done
+        ;;
+    esac
+}
+
+# Save current variable value into a list and replace it with the `=` parameter
+# or unset it if necessary.
+push() {
+    case $# in
+        (0) THIS=push throw "expected name or definition";;
+        (*)
+            while test $# != 0; do
+                case ${1%%=*} in
+                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=push throw "$1: bad name";;
+                    (*)
+                        # Lord have mercy. I wonder if the subshell can be destroyed.
+                        eval "
+                            case \${${1%%=*}+.} in
+                                (.) __${1%%=*}=\"\$(wrap \"\$${1%%=*}\")\${__${1%%=*}+ \${__${1%%=*}}}\";;
+                                ('') :;;
+                            esac
+                        "
+                        case $1 in
+                            (*=*) eval "${1%%=*}=\${1#*=}";;
+                            (*) unset "$1";;
+                        esac
+                    ;;
+                esac
+                shift
+            done
+        ;;
+    esac
+}
+
+# Congeal a variable and its shadow stack into one quote list.
+list() {
+    case $# in
+        (0) THIS=list throw "expected name";;
+        (1)
+            case $1 in
+                ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=list throw "$1: bad name";;
+                (*)
+                    eval "
+                        case \"\${$1+1}\${__$1+2}\" in
+                            (1*)
+                                printf '%s\\n' \"\$(wrap \"\$$1\")\${__$1+ \${__$1}}\"
+                            ;;
+                            (2)
+                                # TODO: Figure out how to deal with 'null' nodes
+                            ;;
+                            (*)
+                                THIS=list throw \"\$1: undefined list\"
+                            ;;
+                        esac
+                    "
+                ;;
+            esac
+        ;;
+        (*) THIS=list throw "too many arguments";;
+    esac
+}
+
+unlist() {
+    case $# in
+        (0) THIS=unlist throw "expected name(s)";;
+        (*)
+            while test $# != 0; do
+                case $1 in
+                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=unlist throw "$1: bad name";;
+                    (*)
+                        eval "unset $1 __$1"
+                    ;;
+                esac
+                shift
+            done
+        ;;
+    esac
+}
+
+pop() {
+    case $# in
+        (0) THIS=pop throw "expected name";;
+        (1)
+            case $1 in
+                ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=pop throw "$1: bad name";;
+                (*)
+                    # the subshells here should be removeable with a nested
+                    # eval, except for the quote
+                    eval "
+                        case \$- in
+                            (*f*) set -- $(peek "__$1");;
+                            (*) set -f; set +f -- $(peek "__$1");;
+                        esac
+                        $1=\$1
+                        2>/dev/null shift || unset $1 __$1
+                        __$1=\"\$(quote \"\$@\")\"
+                    "
+                ;;
+            esac
+        ;;
+        (*) THIS=pop throw "too many arguments";;
+    esac
+}
+
+# Check for variable presence.
+given() {
+    while [ $# -gt 0 ]; do
+        eval "case \${$1+.} in ('') return 1;; esac"
+        shift
+    done
+}
+
+# Mask a shell option for the parameterized command. If no arguments are
+# provided it will determine if the option is set. Unsafe (for now).
+setmask() {
+    case $# in
+        (0) THIS=setmask throw "expected option character";;
+        (1)
+            case $1 in
+                ([A-Za-z0-9]) eval "case \$- in (*$1*) :;; (*) return 1;; esac";;
+                (*[!A-Za-z0-9_]*) THIS=setmask throw "$1: invalid option";;
+                (*)
+                    # TODO: Support checking for if the option exists at all or not
+                    set -- "$1" "$(set +o)"
+                    case $2 in
+                        (*"-o $1"*) return 0;;
+                        (*"+o $1"*) return 1;;
+                        (*) THIS=setmask STATUS=2 throw "$1: option not found";;
+                    esac
+                    #eval "set +o | grep \"-o $1\" 2>/dev/null"
+                ;;
+            esac
+        ;;
+        (*)
+            case $1 in
+                ([A-Za-z0-9])
+                    eval "
+                        shift
+                        case \$- in
+                            (*$1*) \"\$@\";;
+                            (*)
+                                if set -$1; then
+                                    \"\$@\"
+                                    eval \"
+                                        set +$1
+                                        return \$?
+                                    \"
+                                else
+                                    THIS=\"\${THIS-setmask}\" throw \"$1: failed to set option\"
+                                fi
+                            ;;
+                        esac
+                    "
+                ;;
+                (*[!A-Za-z0-9_]*) THIS=setmask throw "$1: invalid option";;
+                (*)
+                    # This depends on the User Portability Utilities being present,
+                    # which I feel pretty comfortable in assuming for most platforms.
+                    # Maybe add a check if anyone runs into any situations where this
+                    # is actually a problem.
+                    eval "
+                        shift
+                        # Get rid of this grep
+                        if set +o | grep \"-o $1\" 2>/dev/null >&2; then
+                            \"\$@\"
+                        else
+                            if set -o $1; then
+                                \"\$@\"
+                                eval \"
+                                    set +o $1
+                                    return \$?
+                                \"
+                            else
+                                THIS=\"\${THIS-setmask}\" throw \"$1: failed to set option\"
+                            fi
+                        fi
+                    "
+                ;;
+            esac
+        ;;
+    esac
+}
+
+# All variables will be exported.
+allexport() {
+    THIS=allexport setmask a "$@"
+}
+
+interactive() {
+    THIS=interactive setmask i "$@"
+}
+
+# All [most] errors will cause an exit.
+errexit() {
+    THIS=errexit setmask e "$@"
+}
+
+# Files will not be clobbered by stream redirects unless done with `>|`.
+noclobber() {
+    THIS=noclobber setmask C "$@"
+}
+
+# Parameters won't glob.
+noglob() {
+    THIS=noglob setmask f "$@"
+}
+
+# Commands won't actually be executed, just printed to stdout.
+# This needs to be subshelled for hopefully obvious reasons. Sometimes won't
+# work depending on the environment.
+noexec() {
+    ( THIS=noexec setmask n "$@" )
+}
+
+# Commands will be printed as they are executed, as well as execution context
+# indicated. Most useful one of these by far.
+xtrace() {
+    THIS=xtrace setmask x "$@"
+}
+
+# References to unset variables will cause exits.
+nounset() {
+    THIS=nounset setmask u "$@"
+}
+
+notify() {
+    THIS=notify setmask b "$@"
+}
+
+# The shell shall write its input to stderr as it is read.
+verbose() {
+    THIS=verbose setmask v "$@"
+}
+
+monitor() {
+    THIS=monitor setmask m "$@"
+}
+
+pipefail() {
+    THIS=pipefail setmask pipefail "$@"
+}
+
+ignoreeof() {
+    THIS=ignoreeof setmask ignoreeof "$@"
+}
+
+# Report status (without modifying it) or set it.
+status() {
+    case $# in
+        (0) printf '%s\n' "$?";;
+        (1)
+            case $1 in
+                (*[!0-9]*) THIS=status throw "bad value, expected integer";;
+                (*) return "$1";; 
+            esac
+        ;;
+        (*) THIS=status throw "too many arguments";;
+    esac
+}
+
+# Stick variable value into the back of the history of a given vartiable.
+queue() {
+    case $# in
+        (0) THIS=queue throw "expected name or definition";;
+        (*)
+            while test $# != 0; do
+                case ${1%%=*} in
+                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=queue throw "$1: bad name";;
+                    (*)
+                        eval "__${1%%=*}=\"\${__${1%%=*}+\${__${1%%=*}} }\$(quote \"\${1#*=}\")\""
+                    ;;
+                esac
+                shift
+            done
+        ;;
+    esac
+}
+
+# TODO: Feature, bug detection
