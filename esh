@@ -1,159 +1,187 @@
 #!/bin/sh
 
-# shellcheck disable=SC2209
+#             .x+=:.
+#             z`    ^%    .uef^"
+#                 .   <k :d88E
+#     .u       .@8Ned8" `888E
+#  ud8888.   .@^%8888"   888E .z8k
+# :888'8888. x88:  `)8b.  888E~?888L                (ɔ) 2025 trvv.me
+# d888 '88%" 8888N=*8888  888E  888E
+# 8888.+"     %8"    R88  888E  888E                  "yOUR eSHCAPE"
+# 8888L        @8Wou 9%   888E  888E
+# '8888c. .+ .888888P`    888E  888E
+#  "88888%   `   ^"F     m888N= 888>
+#      "YP'                 `Y"   888
+#                                  J88"
+#                                  @%
+#                                :"
 
-#################
-# Your eshcape. #
-#################
+alias @set='eval "set -f; set +f --"'
+alias isnt='! is'
 
-# Note that the space at the end of an alias definition is meaningful.
+_() {
+	push FN "$1"
+	"$@"
+	eval "pop FN; return $?"
+}
 
-# Honestly don't think many of the aliases will be used, so it is fair to
-# consider removing them entirely. Not for now, though.
+all() {
+	eval "
+		shift
+		while test $# -gt 0; do
+		    $1 \"\$1\" && shift || return
+		done
+    "
+}
 
-# Usage: forever :; reverof
-# Example:
-#   forever echo hi; reverof
-# Shorthand for infinite loops.
-# alias forever='while :; do '
-# alias reverof='done'
+are() {
+    test $# = 0 || throw "are: expected predicate" || return
+    is name "$1" || throw "is: $1: bad name" || return
+	eval "shift; all 'is $1' \"\$@\""
+}
 
-# Shorthand for a succesful return. Encouraged over `:`.
-#alias pass='return 0'
+is() {
+    case $# in
+        (2) :;;
+        (0) throw "is: expected predicate and argument";;
+        (1) throw "is: expected argument";;
+        (*) throw "is: too many arguments";;
+    esac || return
+	# TODO: These need to be made sexier. I have no idea quite how to do it, though.
+    case $1 in
+        (name)          ! match '[!A-Za-z_]*|*[!A-Za-z_0-9]*' "$2";;
+        (natural)       ! match '*[!0-9]*' "$2";;
+		(command)       >/dev/null command -V "$2";;
+        (block)         test -b "$2";;
+        (stream)        test -c "$2";;
+        (directory)     test -d "$2";;
+        (empty)         test -s "$2";;
+        (extant)        test -e "$2";;
+        (file)          test -f "$2";;
+        (sgid)          test -g "$2";;
+        (symlink)       test -h "$2";;
+        (fifo)          test -p "$2";;
+        (readable)      test -r "$2";;
+        (socket)        test -S "$2";;
+        (terminal)      test -t "$2";;
+        (suid)          test -u "$2";;
+        (writeable)     test -w "$2";;
+        (executable)    test -x "$2";;
+        (null)          test -z "$2";;
+		(*)             throw "is: $2: bad predicate";;
+    esac
+}
 
-# Shorthand for an unsuccesful return; inherits previous command's status
-# if erroneous.
-#alias fail='return $(($? ? $? : 1))'
-
-# Longhand for `!`.
-# alias not='! '
-
-# Shorthand for an ok status. Probably don't need longterm.
-# alias so='test $? = 0'
-
-# Report a message to stderr and exit or return a negative status. Inherits an
-# STATUS variable for returning and a THIS variable for context indication.
 throw() {
-    # shellcheck disable=SC2319
     eval "
-        test \$# != 0 && >&2 printf '%s\\n' \"\${THIS+\"\$THIS: \"}\$*\"
+        >&2 printf '%s\\n' \"\$@\"
         case \$- in
-            (*i*) return \"\${STATUS-$(($? ? $? : 1))}\";;
-            (*) exit \"\${STATUS-$(($? ? $? : 1))}\";;
+            (*i*) return $(($? ? $? : 254));;
+            (*) exit $(($? ? $? : 255));;
         esac
     "
 }
 
-# Variadic quote. Depends on wrap(f).
-quote() {
-    case $# in
-        (0) :;;
-        (1) wrap "$1";;
-        (*)
-            while test $# != 1; do
-                wrap "$1" '%s%c' "$IFS"
-                shift
-            done
-            wrap "$1"
-        ;;
-    esac
+wrap() {
+    test $# = 0 && return
+	while test $# != 1; do
+		quote "$1" ' '
+		shift
+	done
+	quote "$1"
 }
 
-# Basic string matching. Not safe.
 match() {
     case $# in
-        (0) THIS=match throw "expected pattern argument";;
-        (1) THIS=match throw "expected argument";;
-        (2) eval "case \$2 in ($1) :;; (*) !;; esac";;
-        (*) THIS=match throw "too many arguments";;
-    esac
+        (2) :;;
+        (0) throw "match: expected pattern";;
+        (1) throw "match: expected expression";;
+        (*) throw "match: too many arguments"
+    esac || return
+    eval "case \$2 in ($1) :;; (*) return 1;; esac"
 }
 
-# This is a seperate function and not a `not match` because there is the chance
-# that at some point these support variadic argumentation and then would need
-# different variations for different short circuit behaviors on the AND
-# condition over all of the arguments.
-clash() {
+quote() {
     case $# in
-        (0) THIS=clash throw "expected pattern argument";;
-        (1) THIS=clash throw "expected argument";;
-        (2) eval "case \$2 in ($1) !;; (*) :;; esac";;
-        (*) THIS=clash throw "too many arguments";;
-    esac
-}
-
-# Safely quote a given string. Optionally accepts a printf format string to
-# template the newly quoted string. And a secret third variable for injecting
-# IFS for usage in `list`.
-wrap() {
-    # shellcheck disable=SC2059,SC2139
-    case $# in
-        (0) THIS=wrap throw "expected argument";;
-        (*)
-            case $1 in
-                (*\'*)
-                    # Alias abuse
-                    set -- "$(
-                        alias _="$1"
-                        alias _
-                    )"
-                    printf "${2-"%s\\n"}" "${1#??}" ${3+"$3"}
-                ;;
-                (*) printf "${2-"%s\\n"}" "'$1'" ${3+"$3"};;
-            esac
-        ;;
-    esac
+        (1|2) :;;
+        (0) throw "quote: expected string";;
+        (*) throw "quote: too many arguments";;
+    esac || return
+    if 2>/dev/null match '*'"'"'*' "$1"; then
+        # shellcheck disable=SC2139
+        set -- "$(alias _="$1"; alias _)" ${2+"$2"}
+        printf '%s%b' "${1#??}" "${2-\\n}"
+    else
+        printf '%s%b' "'$1'" "${2-\\n}"
+    fi
 }
 
 # Safely expand variable by name.
 peek() {
     case $# in
-        (0) THIS=peek throw "expected name";;
-        (1)
-            case $1 in
-                ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=peek throw "$1: bad name";;
-                (*) eval "printf '%s\\n' \"\$$1\"";;
-            esac
-        ;;
-        (*) THIS=peek throw "too many arguments";;
-    esac
+        (1) :;;
+        (0) throw "peek: expected name";;
+        (*) throw "peek: too many arguments";;
+    esac || return
+    is name "$1" || throw "peek: $1: bad name" || return
+    eval "printf '%s\\n' \"\$$1\""
 }
 
-# Unsafe, complete parameter expansion.
 expand() {
     case $# in
-        (0) THIS=expand throw "expected name";;
-        (1) eval "printf '%s\\n' \"\${$1}\"";;
-        (*) THIS=expand throw "too many arguments";;
-    esac
+        (1) :;;
+        (0) throw "expand: expected expansion";;
+        (*) throw "expand: too many arguments";;
+    esac || return
+    eval "printf '%s\\n' \"\${$1}\""
 }
 
-# Set variable, without defaulting any traits. Shaped like declare.
 put() {
-    case $# in
-        (0) THIS=put throw "expected name or definition";;
-        (*)
-            while test $# != 0; do
-                # Might be a way to optimize this down to a single case.
-                # Might be.
-                case ${1%%=*} in
-                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=put throw "$1: bad name";;
-                    (*)
-                        case $1 in
-                            (*=*) eval "${1%%=*}=\${1#*=}";;
-                            (*) unset "$1";;
-                        esac
-                    ;;
-                esac
-                shift
-            done
-        ;;
-    esac
+	test $# != 0 || throw "put: expected name or definition" || return
+    while test $# != 0; do
+		# NOTE: Might be a way to make this a single check on the string.
+        is name "${1%%=*}" || throw "put: $1: bad name" || return
+		if match '*=*' "$1"; then
+			eval "${1%%=*}=\${1#*=}"
+		else
+			unset -v "$1"
+		fi
+        shift
+    done
 }
 
-# Save current variable value into a list and replace it with the `=` parameter
-# or unset it if necessary.
+# This is actually a terrible implementation of push. All of the items in the
+# stack should be stored as their own variables for reasonable indexing.
+#
+# The basic idea is that for a variable $X that is described as a stack should
+# have a corresponding stack pointer at $X_ which will contain a natural number
+# of the highest current stack position.
+#
+# ex: push X="a" X="b"
+# 
+# This example should result in $X = "b", $X_ = "2", and $X_1 = "a".
+#
+# A pop[s] operation on X should result in $X = "a", $X_ = "1", and $X_1 is unset.
+
 push() {
+    test $# != 0 || throw "push: expected name or definition" || return
+    while test $# != 0; do
+        is name "${1%%=*}" || throw "push: $1: bad name" || return
+        eval "
+            : \${${1%%=*}_=1}
+            if defined ${1%%=*}; then
+                eval \"put ${1%%=*}_\\\${${1%%=*}_\${${1%%=*}_}}=\\\${1#*=}\"
+            else
+                eval \"unset -v ${1%%=*}_\\\${${1%%=*}_\${${1%%=*}_}}\"
+            fi
+            ${1%%=*}_=\$((${1%%=*}_ + 1))
+        "
+        put "$1"
+        shift
+    done
+}
+
+oldpush() {
     case $# in
         (0) THIS=push throw "expected name or definition";;
         (*)
@@ -181,7 +209,7 @@ push() {
 }
 
 # Congeal a variable and its shadow stack into one quote list.
-list() {
+xlist() {
     case $# in
         (0) THIS=list throw "expected name";;
         (1)
@@ -209,20 +237,12 @@ list() {
 }
 
 unlist() {
-    case $# in
-        (0) THIS=unlist throw "expected name(s)";;
-        (*)
-            while test $# != 0; do
-                case $1 in
-                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=unlist throw "$1: bad name";;
-                    (*)
-                        eval "unset $1 __$1"
-                    ;;
-                esac
-                shift
-            done
-        ;;
-    esac
+    test $# != 0 || throw "expected name(s)" || return
+    while test $# != 0; do
+        is name "$1" || throw "unlist: $1: bad name" || return
+        eval "unset $1 __$1"
+        shift
+    done
 }
 
 pop() {
@@ -250,9 +270,8 @@ pop() {
     esac
 }
 
-# Check for variable presence.
-given() {
-    while [ $# -gt 0 ]; do
+defined() {
+    while test $# -gt 0; do
         eval "case \${$1+.} in ('') return 1;; esac"
         shift
     done
@@ -329,77 +348,16 @@ setmask() {
     esac
 }
 
-# All variables will be exported.
-allexport() {
-    THIS=allexport setmask a "$@"
-}
-
-interactive() {
-    THIS=interactive setmask i "$@"
-}
-
-# All [most] errors will cause an exit.
-errexit() {
-    THIS=errexit setmask e "$@"
-}
-
-# Files will not be clobbered by stream redirects unless done with `>|`.
-noclobber() {
-    THIS=noclobber setmask C "$@"
-}
-
-# Parameters won't glob.
-noglob() {
-    THIS=noglob setmask f "$@"
-}
-
-# Commands won't actually be executed, just printed to stdout.
-# This needs to be subshelled for hopefully obvious reasons. Sometimes won't
-# work depending on the environment.
-noexec() {
-    ( THIS=noexec setmask n "$@" )
-}
-
-# Commands will be printed as they are executed, as well as execution context
-# indicated. Most useful one of these by far.
-xtrace() {
-    THIS=xtrace setmask x "$@"
-}
-
-# References to unset variables will cause exits.
-nounset() {
-    THIS=nounset setmask u "$@"
-}
-
-notify() {
-    THIS=notify setmask b "$@"
-}
-
-# The shell shall write its input to stderr as it is read.
-verbose() {
-    THIS=verbose setmask v "$@"
-}
-
-monitor() {
-    THIS=monitor setmask m "$@"
-}
-
-pipefail() {
-    THIS=pipefail setmask pipefail "$@"
-}
-
-ignoreeof() {
-    THIS=ignoreeof setmask ignoreeof "$@"
-}
-
 # Report status (without modifying it) or set it.
 status() {
     case $# in
         (0) printf '%s\n' "$?";;
         (1)
             case $1 in
+                (pass) return 0;;
+                (fail) return 1;;
                 (*[!0-9]*) THIS=status throw "bad value, expected integer";;
-                (*) return "$1";; 
+                (*) return "$1";;
             esac
         ;;
         (*) THIS=status throw "too many arguments";;
