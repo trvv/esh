@@ -1,5 +1,5 @@
 #!/bin/sh
-
+# ```
 #             .x+=:.
 #             z`    ^%    .uef^"
 #                 .   <k :d88E
@@ -15,9 +15,62 @@
 #                                  J88"
 #                                  @%
 #                                :"
+# ```
 
-alias @set='eval "set -f; set +f --"'
-alias isnt='! is'
+# # Introduction
+# 
+# *Esh* is a library for writing portable programs on any POSIX compliant Unix
+# system entirely within the system shell.
+
+# # Source
+
+out() {
+    # Simplified string printing. 
+    printf '%s\n' "$@"
+}
+
+shmd() {
+    #push line state=code
+    state=docs
+    while IFS= read -r line; do
+        case $state in
+            (code)
+                case $line in
+                    ('')
+                        # shellcheck disable=SC2016
+                        printf '\n';;
+                    ('# '*)
+                        printf '```\n%s\n' "${line#??}"
+                        state=docs
+                    ;;
+                    (*'() {'*)
+                        # shellcheck disable=SC2016
+                        printf '```\n## `%s`\n```sh\n%s\n' "${line%%\(\)*}" "$line"
+                    ;;
+                    (*) printf '%s\n' "$line";;
+                esac
+            ;;
+            (docs)
+                case $line in
+                    ('') :;;
+                    ('#') printf '\n\n';;
+                    ('# '*) printf '%s\n' "${line#??}";;
+                    (*[A-Za-z_0-9]'() {'*)
+                        # shellcheck disable=SC2016
+                        printf '## `%s`\n```sh\n%s\n' "${line%%\(\)*}" "$line"
+                        state=code
+                    ;;
+                    (*)
+                        printf '```sh\n%s\n' "$line"
+                        state=code
+                    ;;
+                esac
+            ;;
+        esac
+        >&2 echo "$state| $line"
+    done
+    #pop line state
+}
 
 _() {
 	push FN "$1"
@@ -107,7 +160,7 @@ quote() {
         (0) throw "quote: expected string";;
         (*) throw "quote: too many arguments";;
     esac || return
-    if 2>/dev/null match '*'"'"'*' "$1"; then
+    if match '*'"\\'"'*' "$1"; then
         # shellcheck disable=SC2139
         set -- "$(alias _="$1"; alias _)" ${2+"$2"}
         printf '%s%b' "${1#??}" "${2-\\n}"
@@ -115,7 +168,7 @@ quote() {
         printf '%s%b' "'$1'" "${2-\\n}"
     fi
 }
-
+# 
 # Safely expand variable by name.
 peek() {
     case $# in
@@ -124,7 +177,7 @@ peek() {
         (*) throw "peek: too many arguments";;
     esac || return
     is name "$1" || throw "peek: $1: bad name" || return
-    eval "printf '%s\\n' \"\$$1\""
+    xeval "out \"\$$1\""
 }
 
 expand() {
@@ -150,29 +203,28 @@ put() {
     done
 }
 
-# This is actually a terrible implementation of push. All of the items in the
-# stack should be stored as their own variables for reasonable indexing.
-#
-# The basic idea is that for a variable $X that is described as a stack should
-# have a corresponding stack pointer at $X_ which will contain a natural number
-# of the highest current stack position.
-#
-# ex: push X="a" X="b"
-# 
-# This example should result in $X = "b", $X_ = "2", and $X_1 = "a".
-#
-# A pop[s] operation on X should result in $X = "a", $X_ = "1", and $X_1 is unset.
+move() {
+    test $# = 2 || throw "move: expected target and source" || return
+    is name "$1" || throw "move: $1: bad name (target)" || return
+    is name "$2" || throw "move: $2: bad name (source)" || return
+    move_unsafe "$1" "$2"
+}
+
+move_unsafe() {
+    eval "$1=\$$2"
+}
+
+# TODO: Implement a pull operator that works like a pop from the 
 
 push() {
     test $# != 0 || throw "push: expected name or definition" || return
     while test $# != 0; do
         is name "${1%%=*}" || throw "push: $1: bad name" || return
         eval "
-            : \${${1%%=*}_=1}
             if defined ${1%%=*}; then
-                eval \"put ${1%%=*}_\\\${${1%%=*}_\${${1%%=*}_}}=\\\${1#*=}\"
+                __move ${1%%=*}_\${${1%%=*}_=1} \$${1%%=*}
             else
-                eval \"unset -v ${1%%=*}_\\\${${1%%=*}_\${${1%%=*}_}}\"
+                unset -v ${1%%=*}_\${${1%%=*}_=1}
             fi
             ${1%%=*}_=\$((${1%%=*}_ + 1))
         "
@@ -181,31 +233,32 @@ push() {
     done
 }
 
-oldpush() {
-    case $# in
-        (0) THIS=push throw "expected name or definition";;
-        (*)
-            while test $# != 0; do
-                case ${1%%=*} in
-                    ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=push throw "$1: bad name";;
-                    (*)
-                        # Lord have mercy. I wonder if the subshell can be destroyed.
-                        eval "
-                            case \${${1%%=*}+.} in
-                                (.) __${1%%=*}=\"\$(wrap \"\$${1%%=*}\")\${__${1%%=*}+ \${__${1%%=*}}}\";;
-                                ('') :;;
-                            esac
-                        "
-                        case $1 in
-                            (*=*) eval "${1%%=*}=\${1#*=}";;
-                            (*) unset "$1";;
-                        esac
-                    ;;
-                esac
-                shift
-            done
-        ;;
-    esac
+pop() {
+    test $# != 0 || throw "pop: expected name(s)" || return
+    while test $# != 0; do
+        is name "$1" || throw "pop: $1: bad name" || return
+        eval "
+            if defined ${1}_; then
+                out \$$1
+                if __defined ${1}_\$((\${${1}_} - 1)); then
+                    __move $1 ${1}_\$((\${${1}_} - 1))
+                    # this unset is not necessary, but we might want it for cleanliness sake
+                    #unset -v ${1}_\$((\${${1}_} - 1))
+                else
+                    unset -v $1
+                fi
+            else
+                throw 'pop: nothing to pop'
+                return 1
+            fi
+            ${1}_=\$((${1}_ - 1))
+        "
+        shift
+    done
+}
+
+pops() {
+    :
 }
 
 # Congeal a variable and its shadow stack into one quote list.
@@ -236,45 +289,13 @@ xlist() {
     esac
 }
 
-unlist() {
-    test $# != 0 || throw "expected name(s)" || return
-    while test $# != 0; do
-        is name "$1" || throw "unlist: $1: bad name" || return
-        eval "unset $1 __$1"
-        shift
-    done
-}
-
-pop() {
-    case $# in
-        (0) THIS=pop throw "expected name";;
-        (1)
-            case $1 in
-                ([!A-Za-z_]*|*[!A-Za-z_0-9]*) THIS=pop throw "$1: bad name";;
-                (*)
-                    # the subshells here should be removeable with a nested
-                    # eval, except for the quote
-                    eval "
-                        case \$- in
-                            (*f*) set -- $(peek "__$1");;
-                            (*) set -f; set +f -- $(peek "__$1");;
-                        esac
-                        $1=\$1
-                        2>/dev/null shift || unset $1 __$1
-                        __$1=\"\$(quote \"\$@\")\"
-                    "
-                ;;
-            esac
-        ;;
-        (*) THIS=pop throw "too many arguments";;
-    esac
-}
-
 defined() {
-    while test $# -gt 0; do
-        eval "case \${$1+.} in ('') return 1;; esac"
-        shift
-    done
+    is name "$1" || throw "defined: $1: bad name" || return
+    __defined "$@"
+}
+
+__defined() {
+    eval "case \${$1+.} in ('') return 1;; esac"
 }
 
 # Mask a shell option for the parameterized command. If no arguments are
