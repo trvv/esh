@@ -1,27 +1,32 @@
-#!/bin/sh
-#                 .x+=:.
-#                 z`    ^%    .uef^"
-#                     .   <k :d88E
-#         .u       .@8Ned8" `888E
-#      ud8888.   .@^%8888"   888E .z8k
-#     :888'8888. x88:  `)8b.  888E~?888L                (ɔ) 2025 trvv.me
-#     d888 '88%" 8888N=*8888  888E  888E
-#     8888.+"     %8"    R88  888E  888E                  ''yOUR eSHCAPE,,
-#     8888L        @8Wou 9%   888E  888E
-#     '8888c. .+ .888888P`    888E  888E
-#       "88888%   `   ^"F     m888N= 888>
-#          "YP'                 `Y"   888
-#                                      J88"
-#                                      @%
-#                                    :"
+                .x+=:.
+                z`    ^%    .uef^"
+                    .   <k :d88E
+        .u       .@8Ned8" `888E
+     ud8888.   .@^%8888"   888E .z8k
+    :888'8888. x88:  `)8b.  888E~?888L                (ɔ) 2025 trvv.me
+    d888 '88%" 8888N=*8888  888E  888E
+    8888.+"     %8"    R88  888E  888E                  ''yOUR eSHCAPE,,
+    8888L        @8Wou 9%   888E  888E
+    '8888c. .+ .888888P`    888E  888E
+      "88888%   `   ^"F     m888N= 888>
+         "YP'                 `Y"   888
+                                     J88"
+                                     @%
+                                   :"
 
-## About
-# *Esh* is a toolkit for writing powerful, portable shellscripts.
+# About
 
-## Library
+_Esh_ is a toolkit for writing powerful, portable shellscripts.
 
-### defined
-# `defined` `&variable`
+# Library
+
+## defined
+
+`defined` `&variable`
+
+<details><summary>Source (starting @ line 24)</summary>
+
+```sh
 defined() {
     case $# in
         (1) :;;
@@ -32,8 +37,17 @@ defined() {
     eval "case \${$1+.} in ('') return 1;; esac"
 }
 
-### document
-# `document` `?file`
+```
+
+</details>
+
+## document
+
+`document` `?file`
+
+<details><summary>Source (starting @ line 36)</summary>
+
+````sh
 document() {
     [ $# -le 1 ] || throw "document: too many arguments" || return
     push line linenum=0 state=docs
@@ -63,8 +77,17 @@ EOF
     pops line linenum state
 }
 
-### is
-# `is` `predicate` `argument`
+````
+
+</details>
+
+## is
+
+`is` `predicate` `argument`
+
+<details><summary>Source (starting @ line 67)</summary>
+
+```sh
 is() {
     case $# in
         (2) :;;
@@ -96,8 +119,17 @@ is() {
     esac
 }
 
-### match
-# `match` `!pattern` `string`
+```
+
+</details>
+
+## match
+
+`match` `!pattern` `string`
+
+<details><summary>Source (starting @ line 100)</summary>
+
+```sh
 match() {
     case $# in
         (2) :;;
@@ -108,8 +140,17 @@ match() {
     eval "case \$2 in ($1) :;; (*) return 1;; esac"
 }
 
-### move
-# `move` `&target` `&source`
+```
+
+</details>
+
+## move
+
+`move` `&target` `&source`
+
+<details><summary>Source (starting @ line 112)</summary>
+
+```sh
 move() {
     test $# = 2 || throw "move: expected target and source" || return
     is name "$1" || throw "move: $1: bad name (target)" || return
@@ -117,14 +158,32 @@ move() {
     eval "$1=\$$2"
 }
 
-### out
-# `out` `@strings`
+```
+
+</details>
+
+## out
+
+`out` `@strings`
+
+<details><summary>Source (starting @ line 121)</summary>
+
+```sh
 out() {
     printf '%s\n' "$@"
 }
 
-### peek
-# `peek` `&variable`
+```
+
+</details>
+
+## peek
+
+`peek` `&variable`
+
+<details><summary>Source (starting @ line 127)</summary>
+
+```sh
 peek() {
     case $# in
         (1) :;;
@@ -135,8 +194,17 @@ peek() {
     eval "out \"\$$1\""
 }
 
-### pop
-# `pop` `@&variable`
+```
+
+</details>
+
+## pop
+
+`pop` `@&variable`
+
+<details><summary>Source (starting @ line 139)</summary>
+
+```sh
 pop() {
     test $# != 0 || throw "pop: expected name(s)" || return
     while test $# != 0; do
@@ -161,14 +229,32 @@ pop() {
     done
 }
 
-### pops
-# `pops` `@&variable`
+```
+
+</details>
+
+## pops
+
+`pops` `@&variable`
+
+<details><summary>Source (starting @ line 165)</summary>
+
+```sh
 pops() {
     pop "$@" >/dev/null
 }
 
-### push
-# `push` `@&variable?=value`
+```
+
+</details>
+
+## push
+
+`push` `@&variable?=value`
+
+<details><summary>Source (starting @ line 171)</summary>
+
+```sh
 push() {
     test $# != 0 || throw "push: expected name or definition" || return
     while test $# != 0; do
@@ -186,8 +272,17 @@ push() {
     done
 }
 
-### put
-# `put` `@&variable?=value`
+```
+
+</details>
+
+## put
+
+`put` `@&variable?=value`
+
+<details><summary>Source (starting @ line 190)</summary>
+
+```sh
 put() {
 	test $# != 0 || throw "put: expected name or definition" || return
     while test $# != 0; do
@@ -202,8 +297,17 @@ put() {
     done
 }
 
-### quote
-# `quote` `string` `?delimeter`
+```
+
+</details>
+
+## quote
+
+`quote` `string` `?delimeter`
+
+<details><summary>Source (starting @ line 206)</summary>
+
+```sh
 quote() {
     case $# in
         (1|2) :;;
@@ -219,10 +323,19 @@ quote() {
     fi
 }
 
-### setmask
-# `setmask` `option` `?!@command`
-#
-# **DEPRECATED:** This will be removed once [mask](#mask) is stable. 
+```
+
+</details>
+
+## setmask
+
+`setmask` `option` `?!@command`
+
+**DEPRECATED:** This will be removed once [mask](#mask) is stable.
+
+<details><summary>Source (starting @ line 225)</summary>
+
+```sh
 setmask() {
     case $# in
         (0) THIS=setmask throw "expected option character";;
@@ -292,8 +405,17 @@ setmask() {
     esac
 }
 
-### throw
-# `throw` `@strings`
+```
+
+</details>
+
+## throw
+
+`throw` `@strings`
+
+<details><summary>Source (starting @ line 296)</summary>
+
+```sh
 throw() {
     eval "
         >&2 out \"\$@\"
@@ -304,8 +426,17 @@ throw() {
     "
 }
 
-### wrap
-# `wrap` `@strings`
+```
+
+</details>
+
+## wrap
+
+`wrap` `@strings`
+
+<details><summary>Source (starting @ line 308)</summary>
+
+```sh
 wrap() {
     test $# = 0 && return
 	while test $# != 1; do
@@ -315,7 +446,13 @@ wrap() {
 	quote "$1"
 }
 
-## Appendix
-### To do
-# - [ ] Extend [push](#push) and [pop](#pop) for managing environment options
-# - [ ] Implement [mask](#mask)
+```
+
+</details>
+
+# Appendix
+
+## To do
+
+- [ ] Extend [push](#push) and [pop](#pop) for managing environment options
+- [ ] Implement [mask](#mask)
