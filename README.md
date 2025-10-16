@@ -15,13 +15,11 @@
                                    :"
 
 # About
-
-_Esh_ is a toolkit for writing powerful, portable shellscripts.
+*Esh* is a toolkit for writing powerful, portable shellscripts.
 
 # Library
 
 ## defined
-
 `defined` `&variable`
 
 <details><summary>Source (starting @ line 24)</summary>
@@ -42,12 +40,11 @@ defined() {
 </details>
 
 ## document
-
 `document` `?file`
 
 <details><summary>Source (starting @ line 36)</summary>
 
-````sh
+```sh
 document() {
     [ $# -le 1 ] || throw "document: too many arguments" || return
     push line linenum=0 state=docs
@@ -55,7 +52,7 @@ document() {
         case $line in
             ('#!'*) :;;
             ('#'*)
-                [ "$state" = code ] && printf '```\n\n</details>\n\n'
+                [ "$state" = code ] && printf '```\n\n\074/details\076\n\n'
                 state=docs
                 case $line in
                     ('# '*) printf '%s\n' "${line#??}";;
@@ -64,7 +61,7 @@ document() {
             ;;
             ('') printf '\n';;
             (*)
-                [ "$state" = docs ] && printf '\n<details><summary>Source (starting @ line %d)</summary>\n\n```sh\n' "$linenum"
+                [ "$state" = docs ] && printf '\n\074details\076\074summary\076Source (starting @ line %d)\074/summary\076\n\n```sh\n' "$linenum"
                 state=code
                 printf '%s\n' "$line"
             ;;
@@ -73,16 +70,15 @@ document() {
     done <<-EOF
 $(cat ${1+"$1"})
 EOF
-    [ "$state" = code ] && printf '```\n\n</details></summary>\n\n'
+    [ "$state" = code ] && printf '```\n\n\074/details\076\074/summary\076\n\n'
     pops line linenum state
 }
 
-````
+```
 
 </details>
 
 ## is
-
 `is` `predicate` `argument`
 
 <details><summary>Source (starting @ line 67)</summary>
@@ -124,7 +120,6 @@ is() {
 </details>
 
 ## match
-
 `match` `!pattern` `string`
 
 <details><summary>Source (starting @ line 100)</summary>
@@ -145,7 +140,6 @@ match() {
 </details>
 
 ## move
-
 `move` `&target` `&source`
 
 <details><summary>Source (starting @ line 112)</summary>
@@ -163,7 +157,6 @@ move() {
 </details>
 
 ## out
-
 `out` `@strings`
 
 <details><summary>Source (starting @ line 121)</summary>
@@ -178,7 +171,6 @@ out() {
 </details>
 
 ## peek
-
 `peek` `&variable`
 
 <details><summary>Source (starting @ line 127)</summary>
@@ -199,7 +191,6 @@ peek() {
 </details>
 
 ## pop
-
 `pop` `@&variable`
 
 <details><summary>Source (starting @ line 139)</summary>
@@ -234,7 +225,6 @@ pop() {
 </details>
 
 ## pops
-
 `pops` `@&variable`
 
 <details><summary>Source (starting @ line 165)</summary>
@@ -249,7 +239,6 @@ pops() {
 </details>
 
 ## push
-
 `push` `@&variable?=value`
 
 <details><summary>Source (starting @ line 171)</summary>
@@ -277,7 +266,6 @@ push() {
 </details>
 
 ## put
-
 `put` `@&variable?=value`
 
 <details><summary>Source (starting @ line 190)</summary>
@@ -302,7 +290,6 @@ put() {
 </details>
 
 ## quote
-
 `quote` `string` `?delimeter`
 
 <details><summary>Source (starting @ line 206)</summary>
@@ -328,10 +315,9 @@ quote() {
 </details>
 
 ## setmask
-
 `setmask` `option` `?!@command`
 
-**DEPRECATED:** This will be removed once [mask](#mask) is stable.
+**DEPRECATED:** This will be removed once [mask](#mask) is stable. 
 
 <details><summary>Source (starting @ line 225)</summary>
 
@@ -410,7 +396,6 @@ setmask() {
 </details>
 
 ## throw
-
 `throw` `@strings`
 
 <details><summary>Source (starting @ line 296)</summary>
@@ -431,7 +416,6 @@ throw() {
 </details>
 
 ## wrap
-
 `wrap` `@strings`
 
 <details><summary>Source (starting @ line 308)</summary>
@@ -451,8 +435,14 @@ wrap() {
 </details>
 
 # Appendix
-
 ## To do
-
 - [ ] Extend [push](#push) and [pop](#pop) for managing environment options
+  - How would this work?
 - [ ] Implement [mask](#mask)
+- [ ] Add unsafe function variants for better performance (!)
+  - Oftentimes a given function might perform checks that another function it calls internally will then do again
+  - To reduce overhead we can instead use variants of those functions that do not perform the checks when we're absolutely certain nothing will break
+- [ ] Add a githook to automatically regenerate [README.md](#) at pre-commit
+- [ ] Implement bidirectional lists need [queue](queue) and [pull](pull)
+  - Technically this will require introducing a secondary stack pointer that grows "down"
+  - List length calculations would require a simple addition of the two pointers instead of simply referencing the current stack pointer

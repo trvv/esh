@@ -41,7 +41,7 @@ document() {
         case $line in
             ('#!'*) :;;
             ('#'*)
-                [ "$state" = code ] && printf '```\n\n</details>\n\n'
+                [ "$state" = code ] && printf '```\n\n\074/details\076\n\n'
                 state=docs
                 case $line in
                     ('# '*) printf '%s\n' "${line#??}";;
@@ -50,7 +50,7 @@ document() {
             ;;
             ('') printf '\n';;
             (*)
-                [ "$state" = docs ] && printf '\n<details><summary>Source (starting @ line %d)</summary>\n\n```sh\n' "$linenum"
+                [ "$state" = docs ] && printf '\n\074details\076\074summary\076Source (starting @ line %d)\074/summary\076\n\n```sh\n' "$linenum"
                 state=code
                 printf '%s\n' "$line"
             ;;
@@ -59,7 +59,7 @@ document() {
     done <<-EOF
 $(cat ${1+"$1"})
 EOF
-    [ "$state" = code ] && printf '```\n\n</details></summary>\n\n'
+    [ "$state" = code ] && printf '```\n\n\074/details\076\074/summary\076\n\n'
     pops line linenum state
 }
 
@@ -318,4 +318,12 @@ wrap() {
 ## Appendix
 ### To do
 # - [ ] Extend [push](#push) and [pop](#pop) for managing environment options
+#   - How would this work?
 # - [ ] Implement [mask](#mask)
+# - [ ] Add unsafe function variants for better performance (!)
+#   - Oftentimes a given function might perform checks that another function it calls internally will then do again
+#   - To reduce overhead we can instead use variants of those functions that do not perform the checks when we're absolutely certain nothing will break
+# - [ ] Add a githook to automatically regenerate [README.md](#) at pre-commit
+# - [ ] Implement bidirectional lists need [queue](queue) and [pull](pull)
+#   - Technically this will require introducing a secondary stack pointer that grows "down"
+#   - List length calculations would require a simple addition of the two pointers instead of simply referencing the current stack pointer
